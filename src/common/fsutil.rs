@@ -13,7 +13,7 @@ use std::path::{ Path, PathBuf };
 use std::collections::{ HashSet, VecDeque };
 use std::hash::Hash;
 
-#[inline]
+#[inline(always)]
 fn format_token(slice: &str) -> Option<String> {
     let slice = slice
         .chars()
@@ -37,7 +37,7 @@ where
 
     Ok(content
         .split_whitespace()
-        .filter_map(|slice| format_token(slice))
+        .filter_map(format_token)
         .collect::<Vec<String>>()
     )
 }
