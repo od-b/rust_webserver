@@ -1,0 +1,26 @@
+'doctype', 'html', 'html', 'langen', 'head', 'meta', 'charsetutf8', 'titlehello', '', '404title', 'head', 'body', 'h1404h1', 'ppage', 'not', 'foundp', 'body', 'html', 'the', 'tragedy', 'of', 'hamlet', 'prince', 'of', 'denmark', 'let', 'odysseus', '', 'ὈΔΥΣΣΕΎΣ', 'asserteq', 'ὀδυσσεύς', 'odysseustolowercase', '', 'languages', 'without', 'case', 'are', 'not', 'changed', 'let', 'newyear', '', '农历新年', 'by', 'william', 'shakespeare', 'dramatis', 'personae', 'claudius', 'king', 'of', 'denmark', 'marcellus', 'officer', 'hamlet', 'son', 'to', 'the', 'former', 'and', 'nephew', 'to', 'the', 'present', 'king', 'polonius', 'lord', 'chamberlain', 'horatio', 'friend', 'to', 'hamlet', 'laertes', 'son', 'to', 'polonius', 'voltemand', 'courtier', 'cornelius', 'courtier', 'rosencrantz', 'courtier', 'guildenstern', 'courtier', 'osric', 'courtier', 'a', 'gentleman', 'courtier', 'a', 'priest', 'marcellus', 'officer', 'bernardo', 'officer', 'francisco', 'a', 'soldier', 'reynaldo', 'servant', 'to', 'polonius', 'players', 'two', 'clowns', 'gravediggers', 'fortinbras', 'prince', 'of', 'norway', 'a', 'norwegian', 'captain', 'english', 'ambassadors', 'getrude', 'queen', 'of', 'denmark', 'mother', 'to', 'hamlet', 'ophelia', 'daughter', 'to', 'polonius', 'ghost', 'of', 'hamlets', 'father', 'lords', 'ladies', 'officers', 'soldiers', 'sailors', 'messengers', 'attendants', 'scene', 'elsinore', 'act', 'i', 'scene', 'i', 'elsinore', 'a', 'platform', 'before', 'the', 'castle', 'enter', 'two', 'sentinelsfirst', 'francisco', 'who', 'paces', 'up', 'and', 'down', 'at', 'his', 'post', 'then', 'bernardo', 'who', 'approaches', 'him', 'ber', 'whos', 'there', 'fran', 'nay', 'answer', 'me', 'stand', 'and', 'unfold', 'yourself', 'ber', 'long', 'live', 'the', 'king', 'fran', 'bernardo', 'ber', 'he', 'fran', 'you', 'come', 'most', 'carefully', 'upon', 'your', 'hour', 'ber', 'tis', 'now', 'struck', 'twelve', 'get',
+
+
+#[inline(always)]
+fn format_token(slice: &str) -> String {
+    let mut slice = slice
+        .chars()
+        .filter(|c| c.is_alphanumeric())
+        .collect::<String>();
+
+    slice.make_ascii_lowercase();
+    slice
+}
+
+#[inline]
+pub fn tokenize_file(path: &str) -> Result<Vec<String>, io::Error> {
+    let path = fs::canonicalize(path)?;
+    let content = fs::read_to_string(path)?;
+
+    Ok(content
+        .split_whitespace()
+        // .filter_map(|slice| format_token(slice))
+        .map(|slice| format_token(slice))
+        .collect::<Vec<String>>()
+    )
+}
