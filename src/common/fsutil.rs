@@ -58,6 +58,7 @@ impl ExtensionFilter {
             .map(|s| s.into())
             .collect();
 
+
         if inclusive {
             ExtensionFilter::Inclusive(terms)
         } else {
