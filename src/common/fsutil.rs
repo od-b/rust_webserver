@@ -1,17 +1,11 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-
-use std::borrow::Borrow;
 use std::ffi::{ OsStr, OsString };
-// use std::borrow::Borrow;
-// use std::cmp::{ Eq, PartialOrd };
-
-use std::io::{self, prelude::*, BufWriter };
+use std::io;
 use std::fs;
-use std::marker::PhantomData;
 use std::path::{ Path, PathBuf };
-use std::collections::{ HashSet, VecDeque };
-use std::hash::Hash;
+use std::collections::{ HashSet, /* VecDeque */ };
+
+// #[allow(unused_imports)]
+// use std::io::prelude::*;    // needed for flush, idk why compiler is yelling :(
 
 #[inline(always)]
 fn format_token(slice: &str) -> Option<String> {
@@ -253,7 +247,8 @@ mod tests {
                     eprint!("'{}', ", words[i]);
                 }
 
-                io::stdout().flush().unwrap()
+                // io::stdout().flush().unwrap()
+                eprintln!();
             }
             Err(e) => panic!("expected vector of words, got: {e}")
         }
@@ -291,67 +286,3 @@ mod tests {
         }
     }
 }
-
-
-/* fn consume_with_relish<F>(func: F)
-    where F: FnOnce() -> String
-{
-    // `func` consumes its captured variables, so it cannot be run more
-    // than once.
-    println!("Consumed: {}", func());
-
-    println!("Delicious!");
-
-    // Attempting to invoke `func()` again will throw a `use of moved
-    // value` error for `func`.
-}
-
-fn consume_fn() {
-    let x = String::from("x");
-    let consume_and_return_x = move || x;
-    consume_with_relish(consume_and_return_x);
-} */
-
-/* pub trait VerifyComponent<T>{
-    fn verify_component(&self, s: T) -> bool;
-}
-
-impl <C>VerifyComponent<C> for ExtensionFilter<C>
-where
-    C: AsRef<OsStr> + Hash + Eq,
-{
-    fn verify_component(&self, s: C) -> bool {
-        self.terms.contains(&s) == self.inclusive
-    }
-} */
-
-
-/* #[derive(Debug, PartialEq, /* Clone, */ )]
-enum FilterState {
-    Inactive,
-    Inclusive(bool)
-}
-
-impl FilterState {
-    fn val(&self) -> bool {
-        match *self {
-            FilterState::Inactive => true,
-            FilterState::Inclusive(b) => b,
-        }
-    }
-}
-
-impl From<bool> for FilterState {
-    fn from(val: bool) -> Self {
-        FilterState::Inclusive(val)
-    }
-}
-
-impl From<Option<bool>> for FilterState {
-    fn from(item: Option<bool>) -> Self {
-        match item {
-            None => FilterState::Inactive,
-            Some(val) => FilterState::from(val),
-        }
-    }
-} */
