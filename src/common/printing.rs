@@ -66,27 +66,22 @@ macro_rules! printdb {
             // print trace details in yellow, set bold
             eprint!("{}{}:{}:{}{}", "\x1b[93m", file!(), line!(), column!(), "\x1b[0m");
 
-            let mut i = 0;
+            let first = &mut true;
             // for each arg ..
             $(
-                i += 1;
-                match i {
-                    1 => {
-                        // print first arg in italice, without binding name
-                        let s = format!("{:?}", $args);
-                        // shitty workaround to not print quotes for strings
-                        let s = &s[1..s.len()-1];
-                        // print, white letters & italic
-                        eprint!(" >\x1b[1m \x1b[3m{}\x1b[23m", s);
-                    },
-                    2 => {
-                        // stringify to print binding / varname, e.g. x = val
-                        eprint!("\x1b[0m {}=\x1b[35m\x1b[22m{:?}", stringify!($args), $args);
-                    },
-                    _ => {
-                        // print white "," for arg #2+
-                        eprint!("\x1b[37m,\x1b[0m {}=\x1b[35m{:?}", stringify!($args), $args);
-                    }
+                if *first {
+                    *first = false;
+                    // print first arg in italice, without binding name
+                    let s = format!("{:?}", $args)
+                        .chars()
+                        .filter(|c| {*c != '\"' && *c != '\\'})
+                        .collect::<String>();
+    
+                    // print, white letters & italic
+                    eprint!(" >\x1b[1m \x1b[3m{}\x1b[23m", s);
+                } else {
+                    // print white "," for arg #2+
+                    eprint!("\x1b[93m,\x1b[0m {}=\x1b[35m{:?}", stringify!($args), $args);
                 }
             )*
 

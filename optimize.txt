@@ -1,0 +1,7 @@
+$ RUSTFLAGS="-C target-cpu=native" cargo build --release
+
+[profile.release]
+codegen-units = 1
+
+[profile.release]
+lto = true
