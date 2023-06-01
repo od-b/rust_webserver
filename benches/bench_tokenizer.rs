@@ -8,7 +8,7 @@ fn benchmark_tokenizer(c: &mut Criterion) {
     c.bench_function(
         "tokenize_enwik8",
         |b| b.iter(|| {
-            tokenize_file(black_box("./data/enwik8"))
+            tokenize_file::<_, Vec<_>>(black_box("./data/enwik8"))
         })
     );
 }

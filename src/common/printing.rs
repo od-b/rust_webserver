@@ -15,7 +15,7 @@ macro_rules! printdbf {
         // do nothing on release
         if cfg!(debug_assertions) {
             // print trace details in yellow, set bold
-            print!("{}{}:{}:{}{}", "\x1b[93m", file!(), line!(), column!(), "\x1b[0m");
+            eprint!("{}{}:{}:{}{}", "\x1b[93m", file!(), line!(), column!(), "\x1b[0m");
 
             let mut i = 0;
             // for each arg
@@ -28,21 +28,21 @@ macro_rules! printdbf {
                         // shitty workaround to not print quotes for strings
                         let s = &s[1..s.len()-1];
                         // print, white letters & italic
-                        print!(" >\x1b[1m \x1b[3m{}\x1b[23m", s);
+                        eprint!(" >\x1b[1m \x1b[3m{}\x1b[23m", s);
                     },
                     2 => {
                         // stringify to print binding / varname, e.g. x = val
-                        print!("\n\x1b[93m> \x1b[0m\x1b[36m\x1b[22m{} = {:#?}\x1b[93m;", stringify!($args), $args);
+                        eprint!("\n\x1b[93m> \x1b[0m\x1b[36m\x1b[22m{} = {:#?}\x1b[93m;", stringify!($args), $args);
                     },
                     _ => {
                         // print white ";" for arg #2+
-                        print!("\n\x1b[93m> \x1b[0m\x1b[36m{} = {:#?}\x1b[93m;", stringify!($args), $args);
+                        eprint!("\n\x1b[93m> \x1b[0m\x1b[36m{} = {:#?}\x1b[93m;", stringify!($args), $args);
                     }
                 }
             )*
 
             // end bold && flush with newline
-            println!("\x1b[0m\n");
+            eprintln!("\x1b[0m\n");
         }
     }
 }
@@ -64,7 +64,7 @@ macro_rules! printdb {
         // do nothing on release
         if cfg!(debug_assertions) {
             // print trace details in yellow, set bold
-            print!("{}{}:{}:{}{}", "\x1b[93m", file!(), line!(), column!(), "\x1b[0m");
+            eprint!("{}{}:{}:{}{}", "\x1b[93m", file!(), line!(), column!(), "\x1b[0m");
 
             let mut i = 0;
             // for each arg ..
@@ -77,24 +77,26 @@ macro_rules! printdb {
                         // shitty workaround to not print quotes for strings
                         let s = &s[1..s.len()-1];
                         // print, white letters & italic
-                        print!(" >\x1b[1m \x1b[3m{}\x1b[23m", s);
+                        eprint!(" >\x1b[1m \x1b[3m{}\x1b[23m", s);
                     },
                     2 => {
                         // stringify to print binding / varname, e.g. x = val
-                        print!("\x1b[35m\x1b[22m {}={:?}", stringify!($args), $args);
+                        eprint!("\x1b[0m {}=\x1b[35m\x1b[22m{:?}", stringify!($args), $args);
                     },
                     _ => {
                         // print white "," for arg #2+
-                        print!("\x1b[37m,\x1b[35m {}={:?}", stringify!($args), $args);
+                        eprint!("\x1b[37m,\x1b[0m {}=\x1b[35m{:?}", stringify!($args), $args);
                     }
                 }
             )*
 
             // end bold && flush with newline
-            println!("\x1b[0m");
+            eprintln!("\x1b[0m");
         }
     }
 }
+
+
 
 #[macro_export]
 #[cfg_attr(doctest, doc = " ````no_test")]
@@ -116,7 +118,7 @@ macro_rules! printerr {
         // do nothing on release
         if cfg!(debug_assertions) {
             // print trace details in yellow, set bold
-            print!("{}{}:{}:{}{}", "\x1b[41m", file!(), line!(), column!(), "\x1b[0m");
+            eprint!("{}{}:{}:{}{}", "\x1b[41m", file!(), line!(), column!(), "\x1b[0m");
 
             let mut i = 0;
             // for each arg
@@ -125,25 +127,25 @@ macro_rules! printerr {
                 match i {
                     1 => {
                         // print first arg in italice, without var name
+                        // let s = &format!($args);
                         let s = format!("{:?}", $args);
                         // shitty workaround to not print quotes for strings
-                        let s = &s[1..s.len()-1];
                         // print, white letters & italic
-                        print!(" >\x1b[1m \x1b[3m{}\x1b[23m", s);
+                        eprint!(" >\x1b[1m \x1b[3m{}\x1b[23m", &s[1..s.len()-1]);
                     },
                     2 => {
                         // stringify to print binding / varname, e.g. x = val
-                        print!("\x1b[35m\x1b[22m {}={:?}", stringify!($args), $args);
+                        eprint!("\x1b[35m\x1b[22m {}={:#?}", stringify!($args), $args);
                     },
                     _ => {
                         // print white "," for arg #2+
-                        print!("\x1b[37m,\x1b[35m {}={:?}", stringify!($args), $args);
+                        eprint!("\x1b[37m,\x1b[35m {}={:#?}", stringify!($args), $args);
                     }
                 }
             )*
 
             // end bold && flush with newline
-            println!("\x1b[0m");
+            eprintln!("\x1b[0m");
         }
     }
 }

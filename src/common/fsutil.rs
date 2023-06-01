@@ -1,11 +1,9 @@
+// #![allow(unused_imports)]
+use std::io::{ self, /* BufReader */ };
+use std::fs::{ self, /* File */ };
 use std::ffi::{ OsStr, OsString };
-use std::io;
-use std::fs;
 use std::path::{ Path, PathBuf };
 use std::collections::{ HashSet, /* VecDeque */ };
-
-// #[allow(unused_imports)]
-// use std::io::prelude::*;    // needed for flush, idk why compiler is yelling :(
 
 #[inline(always)]
 fn format_token(slice: &str) -> Option<String> {
@@ -23,16 +21,23 @@ fn format_token(slice: &str) -> Option<String> {
 }
 
 #[inline]
-pub fn tokenize_file<P>(path: &P) -> Result<Vec<String>, io::Error>
+pub fn tokenize_file<P, T>(path: &P) -> Result<T, io::Error>
 where
+    T: FromIterator<String>,
     P: AsRef<Path> + ?Sized,
 {
+    // let f = File::open(path)?;
+    // let fsize = f.metadata().unwrap().len();
+    // eprintln!("file: {:#?}; size: {:#?}", f, fsize);
+    // let reader = BufReader::with_capacity(fsize as usize, f);
+    // eprintln!("reader: {:#?}", reader);
+
     let content = fs::read_to_string(path)?;
 
     Ok(content
         .split_whitespace()
         .filter_map(format_token)
-        .collect::<Vec<String>>()
+        .collect::<T>()
     )
 }
 
@@ -52,7 +57,6 @@ impl ExtensionFilter {
             .map(|s| s.into())
             .collect();
 
-
         if inclusive {
             ExtensionFilter::Inclusive(terms)
         } else {
@@ -70,26 +74,33 @@ impl ExtensionFilter {
     }
 }
 
-pub struct FileFinder<'a> {
+pub struct FileFinder {
     canonicalize: bool,
     include_no_ext: bool,
-    extensions: &'a ExtensionFilter,
+    extensions: ExtensionFilter,
 }
 
-impl<'a> Default for FileFinder<'a> {
+impl Default for FileFinder {
+    /// returns a filefinder that will include any/all files
     fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl <'a>FileFinder<'a> {
-    /// new, all-inclusive searcher, using full paths
-    pub fn new() -> Self {
         FileFinder { 
             canonicalize: true,
             include_no_ext: true,
-            extensions: &ExtensionFilter::Any,
+            extensions: ExtensionFilter::Any,
         }
+    }
+}
+
+#[allow(dead_code)]
+impl FileFinder {
+    /// same as FileFinder::default()
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// unwraps the extensionfilter of self
+    fn into_inner(self) -> ExtensionFilter {
+        self.extensions
     }
 
     #[inline]
@@ -120,7 +131,8 @@ impl <'a>FileFinder<'a> {
         dir: PathBuf, 
         results: &mut Vec<PathBuf>, 
         dirs_sizehint: usize
-    ) -> io::Result<()> {
+    ) -> io::Result<()> 
+    {
         let mut dir_queue = Vec::with_capacity(dirs_sizehint);
         dir_queue.push(dir);
 
@@ -173,116 +185,129 @@ impl <'a>FileFinder<'a> {
     }
 }
 
-
 #[cfg(test)]
+#[allow(dead_code, unused_variables, unused_mut)]
 mod tests {
+    #[allow(unused_imports)]
+    use crate::{ printdb, printdbf, printerr };
     use super::*;
 
     #[test]
-    fn filefinder_any() {
-        let query = FileFinder {
+    fn find_and_tokenize() {
+        let finder = FileFinder {
             canonicalize: false,
             include_no_ext: false,
-            extensions: &ExtensionFilter::Any
+            extensions: ExtensionFilter::Any,
+            // extensions: ExtensionFilter::build(vec!["rs", "txt", "html"], true),
         };
 
-        match query.execute("./", 100, 100) {
-            Ok(paths) => {
-                for path in paths.into_iter() {
-                    eprintln!("{:?}", path);
-                }
-            },
-            Err(e) => {
-                panic!("{:#?}", e);
-            }
+        let paths = finder.execute("./", 100, 100)
+            .expect(&format!("ah: {}", "nuts"));
+
+        let mut errors: Vec<io::Error> = vec![];
+
+        for path in paths.into_iter() {
+            let result: Result<Vec<_>, _> = tokenize_file(&path);
+
+            // if result.is_err() {
+            //     errors.push(result.unwrap_err());
+            // } /* else {
+            //     printdb!("", path, words.len());
+            // } */
         }
 
-        match query.execute("./src/", 0, 4) {
-            Ok(paths) => {
-                for path in paths.into_iter() {
-                    eprintln!("{:?}", path);
+        // log errors
+        if !errors.is_empty() {
+            let mut utf_8_errors = 0;
+
+            for (_n, e) in errors.into_iter().enumerate() {
+                if e.kind() == io::ErrorKind::InvalidData {
+                    utf_8_errors += 1;
+                    printerr!(&format!("err {_n}:"), e);
+                } else {
+                    // let msg = format!("err {n}:");
+                    printerr!(&format!("err {_n}:"), e);
                 }
-            },
-            Err(e) => {
-                panic!("{:#?}", e);
             }
+
+            printerr!("", utf_8_errors);
+            panic!();
+        }
+    }
+
+    #[test]
+    fn filefinder_empty_dir() {
+        let finder = FileFinder {
+            canonicalize: true,
+            include_no_ext: true,
+            extensions: ExtensionFilter::Any
+        };
+
+        match finder.execute("./empty/", 100, 100) {
+            Ok(paths) => for path in paths.into_iter() {
+                eprintln!("{:?}", path);
+            },
+            Err(e) => panic!("{:#?}", e),
+        }
+    }
+
+    #[test]
+    fn filefinder_any() {
+        let finder = FileFinder {
+            canonicalize: false,
+            include_no_ext: false,
+            extensions: ExtensionFilter::Any
+        };
+
+        match finder.execute("./", 100, 100) {
+            Ok(paths) => for path in paths.into_iter() {
+                eprintln!("{:?}", path);
+            },
+            Err(e) => panic!("{:#?}", e),
+        }
+
+        match finder.execute("./src/", 0, 4) {
+            Ok(paths) => for path in paths.into_iter() {
+                eprintln!("{:?}", path);
+            },
+            Err(e) => panic!("{:#?}", e),
         }
     }
 
     #[test]
     fn filefinder_extensionfilter() {
-        let ext_filter = ExtensionFilter::build(vec!["txt", "rs"], true);
-
         let query = FileFinder {
             canonicalize: true,
             include_no_ext: false,
-            extensions: &ext_filter
+            extensions: ExtensionFilter::build(vec!["txt", "rs"], true),
         };
 
         match query.execute("./", 100, 0) {
-            Ok(paths) => {
-                for path in paths.into_iter() {
-                    eprintln!("{:?}", path);
-                }
+            Ok(paths) => for path in paths.into_iter() {
+                eprintln!("{:?}", path);
             },
-            Err(e) => {
-                panic!("{:#?}", e);
-            }
+            Err(e) => panic!("{:#?}", e),
         }
     }
 
     #[test]
     fn tokenize_hamlet() {
-        let fp = "./data/hamlet.txt";
+        let path = fs::canonicalize("./data/hamlet.txt").unwrap();
+        let tokenized: Result<Vec<_>, _> = tokenize_file(&path);
 
-        match tokenize_file(&fp) {
-            Ok(words) => {
-                let space = String::from(" ");
-
-                for s in words.clone() {
-                    assert!(!s.contains(&space) && (s != space));
-                }
-
-                for i in 0..100 {
-                    eprint!("'{}', ", words[i]);
-                }
-
-                // io::stdout().flush().unwrap()
-                eprintln!();
-            }
+        match tokenized {
+            Ok(words) => for s in words.into_iter() {
+                assert!(!s.contains(' ') && (s != " "));
+            },
             Err(e) => panic!("expected vector of words, got: {e}")
         }
     }
 
     #[test]
-    fn tokenize_no_words() {
-        let a = tokenize_file("./data/empty_file.txt").unwrap();
-        let b = tokenize_file("./data/empty_file.html").unwrap();
-
-        if a.len() != 0 {
-            for val in a.iter() {
-                println!("{val}");
-            }
-        }
-
-        if b.len() != 0 {
-            for val in b.iter() {
-                println!("{val}");
-            }
-        }
-
-        assert_eq!(a.len(), 0);
-        assert_eq!(b.len(), 0);
-    }
-
-    #[test]
-    fn tokenize_canonicalize() {
-        let path = fs::canonicalize("./data/hamlet.txt").unwrap();
-        let words = tokenize_file(&path).unwrap();
-        let space = String::from(" ");
-
-        for s in words.clone() {
-            assert!(!s.contains(&space) && (s != space));
-        }
+    fn tokenize_wordless_files() {
+        let a: Vec<_> = tokenize_file("./data/empty_file.txt").unwrap();
+        let b: Vec<_> = tokenize_file("./data/empty_file.html").unwrap();
+        assert!(a.is_empty());
+        assert!(b.is_empty());
     }
 }
