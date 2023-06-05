@@ -1,10 +1,11 @@
 #![allow(clippy::len_zero)]
 #![allow(unused_imports)]
 // use smartstring::alias::String;
-use std::io::{self, /* BufReader */};
+use std::io::{self, ErrorKind, /* BufReader */};
 use std::fs::{self, /* File */};
 use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
+// use std::io::ErrorKind;
 // use std::collections::{HashSet, /* VecDeque */};
 // use rustc_hash::{FxHashMap, FxHashSet};
 use ahash::{AHashMap, AHashSet};
@@ -33,9 +34,9 @@ fn format_token(slice: &str) -> Option<String> {
         .map(|c| c.to_ascii_lowercase())
         .collect::<Vec<u8>>();
 
-    if slice.len() > 0 {
+    if !slice.is_empty() {
         // we know with 100% certainty content is utf8 at this point
-        // read_to_string would otherwise have panicked, etc, etc
+        // read_to_string would otherwise have errored, etc
         unsafe { Some(String::from_utf8_unchecked(slice)) }
     } else {
         None
@@ -57,7 +58,7 @@ where
     let content = fs::read_to_string(path)?;
 
     Ok(content
-        .split_whitespace()
+        .split_ascii_whitespace()
         .filter_map(format_token)
         .collect::<T>()
     )
@@ -104,7 +105,7 @@ impl ExtensionFilter {
     }
 
     #[inline(always)]
-    pub fn verify(&self, val: &OsStr) -> bool {
+    pub fn check(&self, val: &OsStr) -> bool {
         match self {
             Self::Inclusive(set) => set.contains(val),
             Self::Exclusive(set) => !set.contains(val),
@@ -125,8 +126,8 @@ impl <T: Into<OsString>> From<Vec<T>> for ExtensionFilter {
 }
 
 pub struct FileFinder {
-    canonicalize: bool,
     include_no_ext: bool,
+    fmt_realpath: bool,
     filter: ExtensionFilter,
 }
 
@@ -137,26 +138,17 @@ impl FileFinder {
         Self::default()
     }
 
-    fn build(canonicalize: bool, include_no_ext: bool, filter: ExtensionFilter) -> Self {
-        Self { canonicalize, include_no_ext, filter }
-    }
-
-    /// consumes/unwraps self, returning the filter
-    fn into_inner(self) -> ExtensionFilter {
-        self.filter
+    fn build(include_no_ext: bool, fmt_realpath: bool, filter: ExtensionFilter) -> Self {
+        Self { include_no_ext, fmt_realpath, filter }
     }
 
     #[inline]
     fn valid_extension(&self, path: &Path) -> bool {
         if let Some(ext) = path.extension() {
-            self.filter.verify(ext)
+            self.filter.check(ext)
         } else {
             self.include_no_ext
         }
-        /* match path.extension() {
-            None => self.include_no_ext,
-            Some(ext) => self.filter.verify(ext),
-        } */
     }
 
     fn rec_find(&self, dir: PathBuf, results: &mut Vec<PathBuf>) -> io::Result<()> {
@@ -173,55 +165,16 @@ impl FileFinder {
         Ok(())
     }
 
-    /* #[inline]
+    #[inline]
     fn queue_find(
         &self, 
-        dir: PathBuf, 
-        results: &mut Vec<PathBuf>, 
-        sizehint_dirs: usize
-    ) -> io::Result<()> 
+        dir: PathBuf,
+        hint_n_files: usize,
+        hint_n_dirs: usize,
+    ) -> io::Result<Vec<PathBuf>>
     {
-        let mut dir_queue = Vec::with_capacity(sizehint_dirs);
-        dir_queue.push(dir);
-
-        let mut i = 0;
-
-        while dir_queue.len() > i {
-            for entry in fs::read_dir(&dir_queue[i])? {
-                let entry = entry?.path();
-
-                if entry.is_dir() {
-                    dir_queue.push(entry);
-                } else if self.valid_extension(&entry) {
-                    results.push(entry);
-                }
-            }
-            i += 1;
-        }
-
-        // eprintln!("n_dirs = {}", dir_queue.len());
-
-        Ok(())
-    } */
-
-    pub fn execute<P: Into<PathBuf>>(
-        &self,
-        dir: P,
-        sizehint_dirs: usize,
-        sizehint_files: usize,
-    ) -> Result<Vec<PathBuf>, io::Error>
-    {
-        let dir = match self.canonicalize {
-            false => dir.into(),
-            true => fs::canonicalize(dir.into())?,
-        };
-
-        if !dir.is_dir() {
-            panic!("path '{:?}' is not a directory", dir);
-        }
-
-        let mut results = Vec::with_capacity(sizehint_files);
-        let mut dir_queue = Vec::with_capacity(sizehint_dirs);
+        let mut results = Vec::with_capacity(hint_n_files);
+        let mut dir_queue = Vec::with_capacity(1 + hint_n_dirs);
         dir_queue.push(dir);
 
         let mut i = 0;
@@ -238,42 +191,59 @@ impl FileFinder {
             i += 1;
         }
 
-        // eprintln!("n_dirs = {}", dir_queue.len());
-
-        // if sizehint_dirs > 0 {
-        //     self.queue_find(dir, &mut results, sizehint_dirs)?;
-        // } else {
-        //     self.rec_find(dir, &mut results)?;
-        // }
-
-        // shrink if vec is oversized
-        if (sizehint_files != 0) && (results.len() < results.capacity()) {
-            results.shrink_to_fit()
+        if hint_n_files != 0 {
+            results.shrink_to_fit();
         }
 
         Ok(results)
     }
+
+    #[inline]
+    pub fn search<P: AsRef<Path>>(&self, dir: P) -> Result<Vec<PathBuf>, io::Error>
+    {
+        self.search_sizehint(dir, 0, 0)
+    }
+
+    pub fn search_sizehint<P: AsRef<Path>>(
+        &self,
+        dir: P,
+        hint_n_dirs: usize,
+        hint_n_files: usize,
+    ) -> Result<Vec<PathBuf>, io::Error>
+    {
+        let dir = match self.fmt_realpath {
+            false => PathBuf::from(dir.as_ref()),
+            true => fs::canonicalize(dir)?
+        };
+
+        if !dir.is_dir() {
+            panic!("not a directory: {:?}", dir);
+        }
+
+        self.queue_find(dir, hint_n_files, hint_n_dirs)
+    }
 }
 
 impl Default for FileFinder {
-    /// default file finder, canonicalizes paths
-    /// includes all files except for those with no extension
+    /// default file finder
+    /// will include all files with an extensions
+    /// canonicalizes paths
     fn default() -> Self {
-        Self::build(true, false, ExtensionFilter::AllInclusive)
+        Self::build(false, true, ExtensionFilter::AllInclusive)
     }
 }
 
 impl From<ExtensionFilter> for FileFinder {
-    /// convenience function, like default but with a filter
+    /// like default but with a filter
     fn from(filter: ExtensionFilter) -> Self {
-        Self::build(true, false, filter)
+        Self::build(false, true, filter)
     }
 }
 
 impl <T: Into<OsString>> From<Vec<T>> for FileFinder {
     /// convenience function, like default but with a filter built from a vector
     fn from(terms: Vec<T>) -> Self {
-        Self::build(true, false, ExtensionFilter::from(terms))
+        Self::build(false, true, ExtensionFilter::from(terms))
     }
 }
 
@@ -289,11 +259,14 @@ mod tests {
 
     #[test]
     fn find_and_tokenize() {
-        // let finder = FileFinder::from(vec!["rs", "txt", "html", "c", "js", "json", "py"]);
-        let finder = FileFinder::default();
-        let paths = finder.execute("/users/odin/code/", 2000, 10000).expect(&format!("err: "));
-        let mut errors: Vec<io::Error> = vec![];
+        let targets = vec!["rs", "txt", "html", "c", "js", "json", "py"];
+        let finder = FileFinder::from(targets);
+        // let finder = FileFinder::default();
+        let paths = finder
+            .search_sizehint("/users/odin/code/", 2000, 10000)
+            .expect(&format!("err: "));
 
+        let mut errors: Vec<io::Error> = vec![];
         let mut n_words: usize = 0;
         let mut n_files: usize = paths.len();
 
@@ -329,7 +302,7 @@ mod tests {
     fn filefinder_empty_dir() {
         let finder = FileFinder::default();
 
-        match finder.execute("./empty/", 100, 100) {
+        match finder.search_sizehint("./empty/", 100, 100) {
             Ok(paths) => for path in paths.into_iter() {
                 eprintln!("{:?}", path);
             },
@@ -341,7 +314,7 @@ mod tests {
     fn filefinder_allinclusive() {
         let finder = FileFinder::default();
 
-        match finder.execute("./", 100, 100) {
+        match finder.search_sizehint("./", 100, 100) {
             Ok(paths) => for path in paths.into_iter() {
                 eprintln!("{:?}", path);
             },
@@ -350,16 +323,10 @@ mod tests {
     }
 
     #[test]
-    fn filefinder_extensionfilter() {
-        let s = "dkjwak".to_owned();
+    fn filefinder_reusefilter() {
+        let finder = FileFinder::from(vec!["txt", "rs"]);
 
-        let query = FileFinder {
-            canonicalize: true,
-            include_no_ext: false,
-            filter: ExtensionFilter::from(vec!["txt", "rs"]),
-        };
-
-        match query.execute("./", 100, 0) {
+        match finder.search_sizehint("./", 100, 100) {
             Ok(paths) => for path in paths.into_iter() {
                 eprintln!("{:?}", path);
             },

@@ -13,7 +13,7 @@ ahash = "0.8.3"
 
 
 [dev-dependencies]
-# criterion = { version = "0.5.1", features = ["html_reports"] }
+criterion = { version = "0.5.1", features = ["html_reports"] }
 
 [[bench]]
 name = "bench_tokenizer"
