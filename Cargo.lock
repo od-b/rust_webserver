@@ -508,6 +508,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "simplesearch"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "criterion",
+]
+
+[[package]]
 name = "syn"
 version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -618,14 +626,6 @@ checksum = "3bdd9ef4e984da1187bf8110c5cf5b845fbc87a23602cdf912386a76fcd3a7c2"
 dependencies = [
  "js-sys",
  "wasm-bindgen",
-]
-
-[[package]]
-name = "webserver"
-version = "0.1.0"
-dependencies = [
- "ahash",
- "criterion",
 ]
 
 [[package]]
